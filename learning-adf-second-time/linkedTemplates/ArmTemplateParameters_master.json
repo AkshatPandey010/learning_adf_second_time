@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "learning-adf-second-time"
+		},
+		"LS_SQL_SERVER_password": {
+			"value": ""
+		},
+		"LS_SQL_SERVER_properties_typeProperties_server": {
+			"value": "learning-adf-second-time-server.database.windows.net"
+		},
+		"LS_SQL_SERVER_properties_typeProperties_database": {
+			"value": "DB_ADF_DEMO"
+		},
+		"LS_SQL_SERVER_properties_typeProperties_userName": {
+			"value": "learn_adf_second_time"
+		},
+		"LS_STORAGE_ACCOUNT_properties_typeProperties_url": {
+			"value": "https://learningadf2ndtime.dfs.core.windows.net/"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
