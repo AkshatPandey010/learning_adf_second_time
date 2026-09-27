@@ -1,0 +1,15 @@
+{
+	"name": "learning-adf-second-time",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "c7430877-045b-418b-9819-d2376afbea0f",
+		"tenantId": "9fe85c06-abb2-453f-861e-dc321aa48f41"
+	}
+}

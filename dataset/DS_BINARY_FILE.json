@@ -1,0 +1,26 @@
+{
+	"name": "DS_BINARY_FILE",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_STORAGE_ACCOUNT",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"source_container": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": {
+					"value": "@dataset().source_container",
+					"type": "Expression"
+				}
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

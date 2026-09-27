@@ -1,0 +1,246 @@
+{
+	"name": "PL_DEMO_INGESTION",
+	"properties": {
+		"activities": [
+			{
+				"name": "Email_notification",
+				"type": "WebActivity",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Check_source_count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": "https://prod-83.southeastasia.logic.azure.com:443/workflows/b9d6cd5cd8994f61ae7308f493f3cc7c/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=N9T2s47HHwsxrwy_BzI_Iq-riTMqBVFjEh4G0kzKkaM",
+					"body": {
+						"value": "{\"table_name\":\"@{pipeline().parameters.table_name}\"}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Read_Watermark_Table",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT watermark_value FROM metadata.table_watermarks WHERE table_name = '@{pipeline().parameters.table_name}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_SQL_SERVER",
+						"type": "DatasetReference",
+						"parameters": {
+							"schema": "metadata",
+							"table_name": "table_watermarks"
+						}
+					}
+				}
+			},
+			{
+				"name": "Check_count_in_source",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Read_Watermark_Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT COUNT(*) AS count FROM dbo.@{pipeline().parameters.table_name} WHERE modifieddate > '@{activity('Read_Watermark_Table').output.firstRow.watermark_value}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_SQL_SERVER",
+						"type": "DatasetReference",
+						"parameters": {
+							"schema": "dbo",
+							"table_name": "Customers"
+						}
+					}
+				}
+			},
+			{
+				"name": "Check_source_count",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Check_count_in_source",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater(activity('Check_count_in_source').output.firstRow.count, 0)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Ingest_SQL_DB_Data",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT * FROM dbo.@{pipeline().parameters.table_name} WHERE ModifiedDate > '@{activity('Read_Watermark_Table').output.firstRow.watermark_value}'",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_SQL_SERVER",
+									"type": "DatasetReference",
+									"parameters": {
+										"schema": "dbo",
+										"table_name": {
+											"value": "@pipeline().parameters.table_name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_CSV_DEMO",
+									"type": "DatasetReference",
+									"parameters": {
+										"table_name": {
+											"value": "@pipeline().parameters.table_name",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Update_watermark",
+							"type": "Script",
+							"dependsOn": [
+								{
+									"activity": "Ingest_SQL_DB_Data",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "LS_SQL_SERVER",
+								"type": "LinkedServiceReference"
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "UPDATE metadata.table_watermarks SET watermark_value = SYSUTCDATETIME() WHERE table_name = '@{pipeline().parameters.table_name}'",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"table_name": {
+				"type": "string",
+				"defaultValue": "Customers"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-09-27T07:12:52Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
